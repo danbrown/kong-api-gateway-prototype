@@ -1,0 +1,90 @@
+##
+## Kong docker-compose for fast installation
+##
+
+version: "3.7"
+
+networks:
+ kong-net:
+  name: kong-net
+  driver: bridge
+
+services:
+
+  #######################################
+  # Kong database migration
+  #######################################
+  kong-migration:
+    container_name: kong-migration
+    image: kong:1.0.3-alpine
+    command: "kong migrations bootstrap"
+    networks:
+      - kong-net
+    restart: on-failure
+    environment:
+      KONG_PG_HOST: 10.5.0.129  # [change-me] : IP address of your postgresql database, must be accessible from kong node
+      KONG_PG_PORT: 5432        # [change-me] : postgresql port
+      KONG_PG_USER: kingkong    # [change-me] : posrgresql username
+      KONG_PG_PASSWORD: kingkongpass    # [change-me] : postgresql password
+      KONG_PG_DATABASE: kingkong-db     # [change-me] : postgresql database, must be exists and accessible by username / password supplied
+
+  #######################################
+  # Kong: The API Gateway
+  #######################################
+  kong:
+    container_name: kong
+    image: kong:1.0.3-alpine
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      KONG_PG_HOST: 10.5.0.129  # [change-me] : IP address of your postgresql database, must be accessible from kong node
+      KONG_PG_PORT: 5432        # [change-me] : postgresql port
+      KONG_PG_USER: kingkong    # [change-me] : posrgresql username
+      KONG_PG_PASSWORD: kingkongpass    # [change-me] : postgresql password
+      KONG_PG_DATABASE: kingkong-db     # [change-me] : postgresql database, must be exists and accessible by username / password supplied
+      KONG_DB_UPDATE_FREQUENCY: 1m
+    depends_on:
+      - kong-migration
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8001"] # [change-me] IP address of kong admin, default to localhost
+      interval: 30s
+      timeout: 3s
+      retries: 10
+    ports:
+      - "80:8000"
+      - "443:8443"
+
+  #######################################
+  # Konga database prepare
+  #######################################
+  konga-prepare:
+    container_name: konga-prepare
+    image: pantsel/konga:0.14.1
+    # [change-me] change postgresql connection : postgresql://[username]:[password]@[address]:[port]/konga_db
+    command: "-c prepare -a postgres -u postgresql://kingkong:kingkongpass@10.5.0.129:5432/konga_db"
+    networks:
+      - kong-net
+    restart: on-failure
+
+  #######################################
+  # Konga: Kong GUI
+  #######################################
+  konga:
+    container_name: konga
+    image: pantsel/konga:0.14.1
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      DB_ADAPTER: postgres
+      DB_HOST: 10.5.0.129   # [change-me] : IP address of your postgresql database, must be accessible from konga node
+      DB_PORT: 5432         # [change-me] : postgresql port
+      DB_USER: kingkong     # [change-me] : postgresql username
+      DB_PASSWORD: kingkongpass     # [change-me] : postgresql password
+      # any string will OK for token
+      TOKEN_SECRET: iu7YDcPLiZkozQXzZ9kka3Ee1Vid5ZgQ
+      DB_DATABASE: konga_db
+      NODE_ENV: production
+    ports:
+      - "1337:1337"
