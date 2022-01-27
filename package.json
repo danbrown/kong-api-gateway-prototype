@@ -1,0 +1,20 @@
+{
+  "name": "kong",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "compose": "docker-compose -f kong-compose.yml -f services-compose.yml up -d"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/danbrown/kong-api-gateway-prototype.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/danbrown/kong-api-gateway-prototype/issues"
+  },
+  "homepage": "https://github.com/danbrown/kong-api-gateway-prototype#readme"
+}

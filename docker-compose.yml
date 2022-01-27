@@ -57,14 +57,13 @@ services:
     image: kong:alpine
     restart: unless-stopped
     networks:
-      kong-net:
-        ipv4_address: 172.1.1.40
+      - kong-net
     environment:
       KONG_DATABASE: postgres
       KONG_PG_HOST: kong-database
       KONG_PG_USER: kong
       KONG_PG_PASSWORD: password
-      # KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
+      KONG_ADMIN_LISTEN: "0.0.0.0:8001, 0.0.0.0:8444 ssl"
       KONG_DB_UPDATE_FREQUENCY: 1m
       KONG_PROXY_ACCESS_LOG: /dev/stdout
       KONG_ADMIN_ACCESS_LOG: /dev/stdout
@@ -117,113 +116,223 @@ services:
       - "1337:1337"
 
   #######################################
-  # SETTING UP MOCK SERVICES
+  # SETTING UP MICRO SERVICES
   #######################################
-  mock-alpha:
-    container_name: alpha
-    restart: unless-stopped
-    build:
-      context: ./mock-alpha
-      dockerfile: ./Dockerfile
-    command: yarn run start
-    ports:
-      - "9001:3000"
-    networks:
-      kong-net:
-        ipv4_address: 172.1.1.11
-    volumes:
-      - ./mock-alpha:/usr/app
+ 
+  
 
-  mock-beta:
-    container_name: beta
+  # Microservice: AUTH
+  auth-db:
+    image: 'postgres:14'
+    container_name: auth-db
     restart: unless-stopped
-    build:
-      context: ./mock-beta
-      dockerfile: ./Dockerfile
-    command: yarn run start
-    ports:
-      - "9002:3000"
-    networks:
-      kong-net:
-        ipv4_address: 172.1.1.12
-    # volumes:
-    #   - ./mock-beta:/usr/app
-
-  mock-gamma:
-    container_name: gamma
-    restart: unless-stopped
-    build:
-      context: ./mock-gamma
-      dockerfile: ./Dockerfile
-    command: yarn run start
-    ports:
-      - "9003:3000"
-    networks:
-      kong-net:
-        ipv4_address: 172.1.1.13
-    # volumes:
-    #   - ./mock-gamma:/usr/app
-
-  mock-omega:
-    container_name: omega
-    restart: unless-stopped
-    build:
-      context: ./mock-omega
-      dockerfile: ./Dockerfile
-    command: yarn run start
-    ports:
-      - "9005:3000"
-    networks:
-      kong-net:
-        ipv4_address: 172.1.1.15
-    # volumes:
-    #   - ./mock-omega:/usr/app
-
-  #######################################
-  # Demo service using node+mongoDB : delta
-  #######################################
-  mock-delta:
-    container_name: delta
-    restart: unless-stopped
-    build:
-      context: ./mock-delta
-      dockerfile: ./Dockerfile
     environment:
-      MONGODB_URL: mongodb://delta-mongo:27017/docker-node-mongo
-      ROUTE_PATH: /delta
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: auth-db
     ports:
-      - "9004:3000"
-    external_links:
-      - delta-mongo
+      - '5433:5432'
     networks:
       kong-net:
-        ipv4_address: 172.1.1.14
-    volumes:
-      - ./mock-delta:/usr/app
-
-  mongo:
-    container_name: delta-mongo
+        ipv4_address: 172.1.1.33
+    
+  auth-api:
+    container_name: auth-api
     restart: unless-stopped
-    image: mongo
-    ports:
-      - "27017:27017"
-    networks:
-      - kong-net
-
-  #######################################
-  # DEMO: Frontend services
-  #######################################
-  react-app:
-    container_name: react-app
-    restart: unless-stopped
-    stdin_open: true
     build:
-      context: ./react-app
+      context: ./wps-micro-auth
       dockerfile: ./Dockerfile
-    environment:
-      - CHOKIDAR_USEPOLLING=true
-    command: "npm run serve"
     ports:
-      - "3001:5000"
+      - '3003:3000'
+    depends_on:
+      - auth-db
+    env_file:
+      - ./wps-micro-auth/.env.dev
     networks:
-      - kong-net
+      kong-net:
+        ipv4_address: 172.1.1.23
+
+
+  # Microservice: MAILER
+  mailer-db:
+    image: 'postgres:14'
+    container_name: mailer-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: mailer-db
+    ports:
+      - '5434:5432'
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.34
+
+  mailer-api:
+    container_name: mailer-api
+    restart: unless-stopped
+    build:
+      context: ./wps-micro-mailer
+      dockerfile: ./Dockerfile
+    ports:
+      - '3004:3000'
+    depends_on:
+      - mailer-db
+    env_file:
+      - ./wps-micro-mailer/.env.dev
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.24
+
+  # Microservice: UPLOADER
+  uploader-api:
+    container_name: uploader-api
+    restart: unless-stopped
+    build:
+      context: ./wps-micro-uploader
+      dockerfile: ./Dockerfile
+    ports:
+      - '3005:3000'
+    env_file:
+      - ./wps-micro-uploader/.env.dev
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.25
+
+  # Microservice: PROJECTS
+  projects-db:
+    image: 'postgres:14'
+    container_name: projects-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: projects-db
+    ports:
+      - '5436:5432'
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.36
+
+  projects-api:
+    container_name: projects-api
+    restart: unless-stopped
+    build:
+      context: ./wps-micro-projects
+      dockerfile: ./Dockerfile
+    ports:
+      - '3006:3000'
+    depends_on:
+      - projects-db
+    env_file:
+      - ./wps-micro-projects/.env.dev
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.26
+
+  # Microservice: BOOKS
+  books-db:
+    image: 'postgres:14'
+    container_name: books-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: books-db
+    ports:
+      - '5437:5432'
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.37
+
+  books-api:
+    container_name: books-api
+    restart: unless-stopped
+    build:
+      context: ./wps-micro-books
+      dockerfile: ./Dockerfile
+    ports:
+      - '3007:3000'
+    depends_on:
+      - books-db
+    env_file:
+      - ./wps-micro-books/.env.dev
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.27
+
+  # Microservice: PAYMENTS
+  payments-db:
+    image: 'postgres:14'
+    container_name: payments-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: payments-db
+    ports:
+      - '5438:5432'
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.38
+
+  payments-api:
+    container_name: payments-api
+    restart: unless-stopped
+    build:
+      context: ./wps-micro-payments
+      dockerfile: ./Dockerfile
+    ports:
+      - '3008:3000'
+    depends_on:
+      - payments-db
+    env_file:
+      - ./wps-micro-payments/.env.dev
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.28
+
+  # Microservice: ORDERS
+  orders-db:
+    image: 'postgres:14'
+    container_name: orders-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: orders-db
+    ports:
+      - '5439:5432'
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.39
+
+  # Microservice: ADMIN
+  admin-db:
+    image: 'postgres:14'
+    container_name: admin-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: admin-db
+    ports:
+      - '5440:5432'
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.40
+
+  # Microservice: POSTS
+  posts-db:
+    image: 'postgres:14'
+    container_name: posts-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: posts-db
+    ports:
+      - '5441:5432'
+    networks:
+      kong-net:
+        ipv4_address: 172.1.1.41

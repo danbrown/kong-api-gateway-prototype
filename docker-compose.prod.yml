@@ -1,0 +1,70 @@
+version: '3.7'
+networks:
+  kong-net:
+    name: kong-net
+    driver: bridge
+services:
+  kong-migration:
+    container_name: kong-migration
+    image: 'kong:1.0.3-alpine'
+    command: kong migrations bootstrap
+    networks:
+      - kong-net
+    restart: on-failure
+    environment:
+      KONG_PG_HOST: 10.5.0.129
+      KONG_PG_PORT: 5432
+      KONG_PG_USER: kingkong
+      KONG_PG_PASSWORD: kingkongpass
+      KONG_PG_DATABASE: kingkong-db
+  kong:
+    container_name: kong
+    image: 'kong:1.0.3-alpine'
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      KONG_PG_HOST: 10.5.0.129
+      KONG_PG_PORT: 5432
+      KONG_PG_USER: kingkong
+      KONG_PG_PASSWORD: kingkongpass
+      KONG_PG_DATABASE: kingkong-db
+      KONG_DB_UPDATE_FREQUENCY: 1m
+    depends_on:
+      - kong-migration
+    healthcheck:
+      test:
+        - CMD
+        - curl
+        - '-f'
+        - 'http://localhost:8001'
+      interval: 30s
+      timeout: 3s
+      retries: 10
+    ports:
+      - '80:8000'
+      - '443:8443'
+  konga-prepare:
+    container_name: konga-prepare
+    image: 'pantsel/konga:0.14.1'
+    command: '-c prepare -a postgres -u postgresql://kingkong:kingkongpass@10.5.0.129:5432/konga_db'
+    networks:
+      - kong-net
+    restart: on-failure
+  konga:
+    container_name: konga
+    image: 'pantsel/konga:0.14.1'
+    restart: always
+    networks:
+      - kong-net
+    environment:
+      DB_ADAPTER: postgres
+      DB_HOST: 10.5.0.129
+      DB_PORT: 5432
+      DB_USER: kingkong
+      DB_PASSWORD: kingkongpass
+      TOKEN_SECRET: iu7YDcPLiZkozQXzZ9kka3Ee1Vid5ZgQ
+      DB_DATABASE: konga_db
+      NODE_ENV: production
+    ports:
+      - '1337:1337'

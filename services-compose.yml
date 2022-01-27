@@ -1,0 +1,175 @@
+version: "3.8"
+
+services:
+  #######################################
+  # SETTING UP MICRO SERVICES
+  #######################################
+
+  auth-db:
+    container_name: auth-db
+    restart: unless-stopped
+    image: postgres:14-alpine
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: 123456
+      POSTGRES_DB: auth-db
+    networks:
+      - kong-net
+
+  wps-micro-auth:
+    container_name: wps-micro-auth
+    restart: unless-stopped
+    build:
+      context: ./wps-micro-auth
+      dockerfile: ./Dockerfile
+    ports:
+      - "3001:3000"
+    depends_on:
+      - auth-db
+    env_file:
+      - ./wps-micro-auth/.env.prod
+    networks:
+      - kong-net
+    external_links:
+      - auth-db
+    volumes:
+      - ./wps-micro-auth:/app
+
+
+  # auth-db:
+  #   container_name: auth-db
+  #   image: postgres:14-alpine
+  #   restart: unless-stopped
+  #   ports:
+  #     - 5434:5432
+  #   environment:
+  #     POSTGRES_USER: admin
+  #     POSTGRES_PASSWORD: 123456
+  #     POSTGRES_DB: auth-db
+  #   networks:
+  #     - kong-net
+
+
+
+  # wps-micro-auth:
+  #   container_name: wps-micro-auth
+  #   restart: unless-stopped
+  #   depends_on:
+  #     - auth-db
+  #   build:
+  #     context: ./wps-micro-auth
+  #     dockerfile: ./Dockerfile
+  #   ports:
+  #     - "3001:3000"
+  #   networks:
+  #     - kong-net
+  #   env_file:
+  #     - ./wps-micro-auth/.env.prod
+  #   volumes:
+  #     - ./wps-micro-auth:/usr/app
+    
+
+
+  # mock-alpha:
+  #   container_name: alpha
+  #   restart: unless-stopped
+  #   build:
+  #     context: ./mock-alpha
+  #     dockerfile: ./Dockerfile
+  #   command: yarn run start
+  #   ports:
+  #     - "9001:3000"
+  #   networks:
+  #     - kong-net
+  #   volumes:
+  #     - ./mock-alpha:/usr/app
+
+  # mock-beta:
+  #   container_name: beta
+  #   restart: unless-stopped
+  #   build:
+  #     context: ./mock-beta
+  #     dockerfile: ./Dockerfile
+  #   command: yarn run start
+  #   ports:
+  #     - "9002:3000"
+  #   networks:
+  #     - kong-net
+  #   # volumes:
+  #   #   - ./mock-beta:/usr/app
+
+  # mock-gamma:
+  #   container_name: gamma
+  #   restart: unless-stopped
+  #   build:
+  #     context: ./mock-gamma
+  #     dockerfile: ./Dockerfile
+  #   command: yarn run start
+  #   ports:
+  #     - "9003:3000"
+  #   networks:
+  #     - kong-net
+  #   # volumes:
+  #   #   - ./mock-gamma:/usr/app
+
+  # mock-omega:
+  #   container_name: omega
+  #   restart: unless-stopped
+  #   build:
+  #     context: ./mock-omega
+  #     dockerfile: ./Dockerfile
+  #   command: yarn run start
+  #   ports:
+  #     - "9005:3000"
+  #   networks:
+  #     - kong-net
+  #   # volumes:
+  #   #   - ./mock-omega:/usr/app
+
+  # #######################################
+  # # Demo service using node+mongoDB : delta
+  # #######################################
+  # mock-delta:
+  #   container_name: delta
+  #   restart: unless-stopped
+  #   build:
+  #     context: ./mock-delta
+  #     dockerfile: ./Dockerfile
+  #   environment:
+  #     MONGODB_URL: mongodb://delta-mongo:27017/docker-node-mongo
+  #     ROUTE_PATH: /delta
+  #   ports:
+  #     - "9004:3000"
+  #   external_links:
+  #     - delta-mongo
+  #   networks:
+  #     - kong-net
+  #   volumes:
+  #     - ./mock-delta:/usr/app
+
+  # mongo:
+  #   container_name: delta-mongo
+  #   restart: unless-stopped
+  #   image: mongo
+  #   ports:
+  #     - "27017:27017"
+  #   networks:
+  #     - kong-net
+
+  # #######################################
+  # # DEMO: Frontend services
+  # #######################################
+  # react-app:
+  #   container_name: react-app
+  #   restart: unless-stopped
+  #   stdin_open: true
+  #   build:
+  #     context: ./react-app
+  #     dockerfile: ./Dockerfile
+  #   environment:
+  #     - CHOKIDAR_USEPOLLING=true
+  #   command: "npm run serve"
+  #   ports:
+  #     - "3001:5000"
+  #   networks:
+  #     - kong-net
